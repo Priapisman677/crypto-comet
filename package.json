@@ -1,0 +1,31 @@
+{
+  "type": "module",
+  "name": "comet",
+  "version": "1.0.0",
+  "main": "comet.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "env-cmd -f ./config/test.env vitest",
+    "start": "node dist/user/server-listen.js",
+    "dev101": "nodemon dist/user/server-listen.js",
+    "dev102": "nodemon dist/user/proxy.js",
+    "debug" : "node inspect dist/user/server-listen.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^22.10.2"
+  },
+  "dependencies": {
+    "@types/nodemon": "^1.19.6",
+    "@types/supertest": "^6.0.2",
+    "chalk": "^5.4.1",
+    "env-cmd": "^10.1.0",
+    "mime": "^4.0.6",
+    "nodemon": "^3.1.9",
+    "supertest": "^7.0.0",
+    "vitest": "^2.1.8"
+  }
+}

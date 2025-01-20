@@ -1,0 +1,36 @@
+{
+	"compilerOptions": {
+		 /* Linting */
+		 "strict": true,
+		 "noUnusedLocals": true,
+		 "noUnusedParameters": true,
+		 "noFallthroughCasesInSwitch": true,
+		 "noUncheckedSideEffectImports": true,
+		 "sourceMap": true,
+		/* Projects */
+		
+		/* Language and Environment */
+		"target": "es2022" /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */,
+
+		/* Modules */
+		"module": "NodeNext" /* Specify what module code is generated. */,
+
+		/* Emit */
+		"outDir": "./dist" /* Specify an output folder for all emitted files. */,
+		"rootDir": "./src" /* Specify the root folder within your source files. */,
+
+		"esModuleInterop": true, /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 
+  
+
+		/* Completeness */
+		// "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
+		"skipLibCheck": true /* Skip type checking all .d.ts files. */
+	},
+
+	"exclude": [
+		"node_modules",
+		"dist",
+		"./vitest.config.ts",
+		"tests"
+	  ]
+}

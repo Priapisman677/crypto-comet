@@ -1,0 +1,14 @@
+Have a route to get the name of an image and to send that image. ___ OK
+Create a function on the request object to get the body such as "req.body". ___ OK
+Have url parameters: I believe for this I need to mess with a for... in loop. I was going to do it but I believe it doesn't provide much value in my current learning of HTTP
+Work on tests for ALL routes. (Almost, but I was not able to create tests that require large streaming)
+Understand nature of reject in promises. ___ OK
+Should be able to handle some type of middleware such as authorization when passed in the route handler. __OK
+Should be able touse something like "app.use(userRouter);"
+
+Cokies, caching (I believe those two have to do with headers)
+Handle multipart/form-data
+
+"Adding CORS headers"
+
+Proxies
