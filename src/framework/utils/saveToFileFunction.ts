@@ -7,11 +7,13 @@ const saveToFileFunction = async (
 	fileName: string,
 	maxSize: number
 ) => {
+	let receivedData = false; //$ The only reason I put this is because sometimes postman fails at sending the an image
 	return new Promise((resolve, _reject) => {
 		//%By default max size is 100MB
 		const writable = fs.createWriteStream(dirPath + fileName);
 		let totalSize = 0;
 		req.on("data", (chunk) => {
+			receivedData = true;
 			totalSize += chunk.length;
 			if (totalSize > maxSize) {
 				console.log("Total size exceeded");
@@ -24,6 +26,10 @@ const saveToFileFunction = async (
 			}
 		});
 		req.on("end", () => {
+			if (!receivedData) {
+				console.log("No data received");
+				return resolve(null);
+			}
 			resolve("success");
 		});
 		writable.on("close", () => {
