@@ -1,14 +1,19 @@
 import request from "supertest";
 import fs from "node:fs";
+import crypto from 'node:crypto'
 import server from "../src/user/server-setup.js";
+import { sessions } from "../src/user/routes.js";
 import { describe, test, expect, beforeAll } from "vitest";
 
 describe("Routes", () => {
 	let cookie;
+	const constantKey = server.symmetricKey
+	// Buffer.from('e49a5e61a1786622984acd671667c1e8ddcffa4041963df47ef8bc738dfa26a6', 'hex')
 	beforeAll(() => {
 		cookie = Math.floor(Math.random() * 100000000000).toString();
 
-		server.SESSIONS.push(cookie);
+		sessions.push(cookie);
+		
 	});
 	test("/getpath should work", async () => {
 		const response = await request(server.server)
@@ -82,11 +87,11 @@ describe("Routes", () => {
 		expect(response.text).toBe("Hello from patchpath!");
 	});
 
-	test('The "/login"  route should work', async () => {
+	test('The "/loginMock"  route should work', async () => {
 		// console.log(cookie)
-		// console.log(server.SESSIONS)
+		// console.log(sessions)
 		const response = await request(server.server)
-			.get("/login")
+			.get("/loginmock")
 			.expect(200);
 		expect(response.headers["set-cookie"][0]).toBeTruthy();
 	});
@@ -106,4 +111,13 @@ describe("Routes", () => {
 			.expect(401);
 		expect(response.text).toBe("cookie verification failed!");
 	});
+	test('Encryption and decreptrion should work', async()=>{
+		const response = await request(server.server)
+		.get('/testencrypt')
+		.expect(200)
+		const [encrypted, iv] = response.text.split(':')
+		const decipher = crypto.createDecipheriv('aes-256-cbc', constantKey, Buffer.from(iv, 'hex'))
+		const message = decipher.update(encrypted, 'hex', 'utf8') + decipher.final('utf8')
+		expect(message).toBe('Hello')
+	})
 });

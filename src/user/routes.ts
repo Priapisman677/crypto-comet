@@ -1,28 +1,23 @@
 import { Router } from "../framework/comet.js";
 import http from "node:http";
 import fs from 'node:fs'
-import server from './server-setup.js'
+import auth from "./middleware/auth.js";
 const router = new Router();
+
+export const sessions: string[] = []
+
 
 export const printHi = (_req: http.IncomingMessage, _res: http.ServerResponse, next: Function)=>{
     console.log('Say hi middleware')
     next()
 }
 
-export const auth = (req: http.IncomingMessage, res: http.ServerResponse, next: Function)=>{
-	const cookie = req.headers.cookie?.split('=')[1].toString()
-	const verification = server.SESSIONS.find((storedCookie)=>{return storedCookie === cookie})
-	// console.log(cookie)
-	if (verification){
-		next()
-	} else{
-		res.statusCode = 401;
-		res.send('cookie verification failed!')
-
-	}
-}
 
 
+//prettier-ignore
+router.get('/', (_req: http.IncomingMessage, res: http.ServerResponse)=>{
+    res.sendFile('index.html')
+})
 //prettier-ignore
 
 router.get('/getpath', printHi, async (req: http.IncomingMessage, res: http.ServerResponse)=>{
@@ -39,9 +34,9 @@ router.get('/testencrypt', (_req: http.IncomingMessage, res: http.ServerResponse
 })
 
 //prettier-ignore
-router.get('/login', (_req: http.IncomingMessage, res: http.ServerResponse)=>{
+router.get('/loginmock', (_req: http.IncomingMessage, res: http.ServerResponse)=>{
     const cookie = Math.floor(Math.random()*100000000000).toString()
-    server.SESSIONS.push(cookie) 
+    sessions.push(cookie) 
     res.setHeader('Set-cookie' ,[`cookie1=${cookie}; HttpOnly; Path=/;`]);
     res.status(200).send(`cookie sent: (${cookie})`)
 })
@@ -49,7 +44,7 @@ router.get('/login', (_req: http.IncomingMessage, res: http.ServerResponse)=>{
 router.get('/checkcookie', (req: http.IncomingMessage, res: http.ServerResponse)=>{
     console.log(req.headers.cookie)
     const cookie = req.headers.cookie?.split('=')[1].toString()
-    const verification = server.SESSIONS.find((storedCookie)=>{return storedCookie === cookie})
+    const verification = sessions.find((storedCookie)=>{return storedCookie === cookie})
     // console.log(cookie)
     if (verification){
         res.send('cookie verification succesful!')
@@ -76,14 +71,8 @@ router.post('/testparsebody', async(req: http.IncomingMessage, res: http.ServerR
         }else{
             res.send(JSON.stringify(body))
         }
-        
-
 })
 
-//prettier-ignore
-router.get('/', (_req: http.IncomingMessage, res: http.ServerResponse)=>{
-    res.sendFile('index.html')
-})
 //prettier-ignore
 router.get('/requestnameimage', (req: http.IncomingMessage, res: http.ServerResponse)=>{
     
@@ -97,12 +86,9 @@ router.get('/requestnameimage', (req: http.IncomingMessage, res: http.ServerResp
         // res.send()
     })
 })
+
 //prettier-ignore
-router.post('/postpath', (_req: http.IncomingMessage, res: http.ServerResponse)=>{
-    res.send('Hello from postpath!')
-})
-//prettier-ignore
-router.post('/upload', (req: http.IncomingMessage, res: http.ServerResponse)=>{
+router.post('/uploadnoname', (req: http.IncomingMessage, res: http.ServerResponse)=>{
     //! I need to implement url parameters here.
     const writable = fs.createWriteStream(__dirname + '/public/' + req.headers['file-name'])
     // req.pipe(writable)
@@ -115,7 +101,7 @@ router.post('/upload', (req: http.IncomingMessage, res: http.ServerResponse)=>{
 })
 
 //prettier-ignore
-router.post("/upload2", async (req: http.IncomingMessage, res: http.ServerResponse) => {
+router.post("/uploadwithname", async (req: http.IncomingMessage, res: http.ServerResponse) => {
     debugger
         const fileName = req.headers['file-name']
         if(!fileName || typeof fileName !== 'string'){
@@ -141,14 +127,22 @@ router.get('/styles.css', (_req: http.IncomingMessage, res: http.ServerResponse)
     // res.statusCode = 200;
     res.sendFile('styles.css')
 })
+
 //prettier-ignore
 router.get('/index.js', (_req: http.IncomingMessage, res: http.ServerResponse)=>{	
     res.sendFile('index.js')
 })
+
+//prettier-ignore
+router.post('/postpath', (_req: http.IncomingMessage, res: http.ServerResponse)=>{
+    res.send('Hello from postpath!')
+})
+
 //prettier-ignore
 router.delete('/deletepath', (_req: http.IncomingMessage, res: http.ServerResponse)=>{
     res.send('Hello from deletepath!')
 })
+
 //prettier-ignore
 router.patch('/patchpath', (_req: http.IncomingMessage, res: http.ServerResponse)=>{
     res.send('Hello from patchpath!')
@@ -159,6 +153,8 @@ process.stdin.on("data", (data) => {
 	const str = data.toString().trim();
 	if (str === "RR" || str === "rr") {
 		console.log(router.routes);
+	}	if (str === "S" || str === "s") {
+		console.log(sessions);
 	}
 
 });

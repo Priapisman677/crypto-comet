@@ -1,5 +1,5 @@
 Public key:
-const constantKey= Buffer.from('e49a5e61a1786622984acd671667c1e8ddcffa4041963df47ef8bc738dfa26a6', 'hex')
+const constantKey = Buffer.from('e49a5e61a1786622984acd671667c1e8ddcffa4041963df47ef8bc738dfa26a6', 'hex')
 
 Fixediv:
 const fixedIv = Buffer.from('0102030405060708090a0b0c0d0e7777', 'hex')

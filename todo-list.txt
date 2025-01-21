@@ -1,9 +1,7 @@
 
 Have url parameters: I believe for this I need to mess with a for... in loop. I was going to do it but I believe it doesn't provide much value in my current learning of HTTP
 
-be ablo to either block  specific IP's or have a whitelist of IP's
-
-Should be able touse something like "app.use(userRouter);"
+Try to send encrypted files and images and decrypt them. Including encrypted headers.
 
 Cokies, caching (I believe those two have to do with headers)
 Handle multipart/form-data
@@ -11,5 +9,3 @@ Handle multipart/form-data
 "Adding CORS headers"
 
 stop for a minute and check websockets
-
-Proxies

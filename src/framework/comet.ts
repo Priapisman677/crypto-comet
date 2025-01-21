@@ -27,13 +27,29 @@ interface routes {
 class Comet {
 	server: Server;
 	routes: routes = {};
+	ipBlackList: string[] = []
+	ipWhiteList: string[] = []
 	staticDir: string = "./public";
-	SESSIONS: string[] = [];
-	symetricKey: Buffer = crypto.randomBytes(32);
 	willEncrypt: boolean = false;
+	willDecrypt: boolean = false;
+	symmetricKey: Buffer = crypto.randomBytes(32);
+	keyPair: any = crypto.generateKeyPairSync("rsa", {
+		modulusLength: 2048,
+		publicKeyEncoding: { type: "spki", format: "pem" },
+		privateKeyEncoding: { type: "pkcs8", format: "pem" },
+	});
 	constructor() {
-		//$ USING C L O U S U R E FUNCTIONS
 		this.server = createServer(async (req, res) => {
+			if (this.ipBlackList.includes(req.socket.remoteAddress!)){
+				res.end('denied')
+				res.destroy()
+				req.destroy()
+			}
+			if (this.ipWhiteList.length > 0 && !this.ipWhiteList.includes(req.socket.remoteAddress!)){
+				res.end('denied')
+				res.destroy()
+				req.destroy()
+			}
 			// console.log(req.url, req.method)
 			const method = req.method || "GET";
 			const path = req.url || "/";
@@ -59,20 +75,35 @@ class Comet {
 						res.end(data);
 					}
 				};
-				//$ CLOSURE
+
 				//prettier-ignore
 				res.sendFile = (fileName: string) => {
                     sendFileFunction(res, this.staticDir, fileName );
                 };
 
+				req.decrypt = () => {
+					this.willDecrypt = true;
+					return req;
+				};
+
+				req.body = async () => {
+					if (!this.willDecrypt) {
+						return await parseBody(req);
+					} else {
+						this.willDecrypt = false
+						const encrypted = await parseBody(req);
+						if (typeof encrypted === "string") {
+							return this.decrypt(encrypted);
+						}else{
+							return null
+						}
+					}
+				};
 				//prettier-ignore
-				//$ CLOSURE
 				req.saveToFile = async (fileName: string, maxSize: number = 1e8)=>{
 					return await saveToFileFunction(this.staticDir, req, fileName, maxSize);
 				}
-				//prettier-ignore
-				//$ CLOSURE
-				req.body = async ()=>{ return await parseBody(req); }
+
 				//prettier-ignore
 				this.executeMiddlewares(req, res, route.middlewares, ()=>{route.handler(req, res)})
 			} else {
@@ -88,7 +119,7 @@ class Comet {
 		if(!this.routes.GET) this.routes.GET = {}
 		const handler = middlewaresAndHandler.pop()	as RouteHandler
 		const middlewares = middlewaresAndHandler as Middleware[];
-		this.routes.GET[path] = {middlewares, handler}
+		this.routes.GET[path.toLowerCase()] = {middlewares, handler}
 	}
 
 	//prettier-ignore
@@ -96,7 +127,7 @@ class Comet {
 		if (!this.routes.POST) this.routes.POST = {}
 		const handler = middlewaresAndHandler.pop() as RouteHandler
 		const middlewares = middlewaresAndHandler as Middleware[];
-		this.routes.POST[path] = {middlewares, handler}
+		this.routes.POST[path.toLowerCase()] = {middlewares, handler}
 	}
 
 	//prettier-ignore
@@ -104,21 +135,21 @@ class Comet {
 		if (!this.routes.DELETE) this.routes.DELETE = {};
 		const handler = middlewaresAndHandler.pop() as RouteHandler;
 		const middlewares = middlewaresAndHandler as Middleware[];
-		this.routes.DELETE[path] = { middlewares, handler };
+		this.routes.DELETE[path.toLowerCase()] = { middlewares, handler };
 	}
 	//prettier-ignore
 	put(path: string, ...middlewaresAndHandler: (Middleware | RouteHandler)[]){
 		if(!this.routes.PUT) this.routes.PUT = {}
 		const handler = middlewaresAndHandler.pop()  as RouteHandler;
 		const middlewares = middlewaresAndHandler as Middleware[];
-		this.routes.PUT[path] = { middlewares, handler}
+		this.routes.PUT[path.toLowerCase()] = { middlewares, handler}
 	}
 	//prettier-ignore
 	patch(path: string, ...middlewaresAndHandler: (Middleware | RouteHandler)[]){
 		if(!this.routes.PATCH) this.routes.PATCH = {}
 		const handler = middlewaresAndHandler.pop()  as RouteHandler;
 		const middlewares = middlewaresAndHandler as Middleware[];
-		this.routes.PATCH[path] = { middlewares, handler}
+		this.routes.PATCH[path.toLowerCase()] = { middlewares, handler}
 	}
 
 	private executeMiddlewares(
@@ -141,24 +172,23 @@ class Comet {
 	useRouter(Router: Router) {
 		for (const method in Router.routes) {
 			const paths = Router.routes[method];
-			for (const path in paths){
+			for (const path in paths) {
 				if (method === "GET") {
 					this.get(path, ...paths[path]);
 				}
-				if(method === 'POST'){
-					this.post(path, ...paths[path])
+				if (method === "POST") {
+					this.post(path, ...paths[path]);
 				}
-				if(method === 'DELETE'){
-					this.delete(path, ...paths[path])
+				if (method === "DELETE") {
+					this.delete(path, ...paths[path]);
 				}
-				if(method === 'PUT'){
-					this.put(path, ...paths[path])
+				if (method === "PUT") {
+					this.put(path, ...paths[path]);
 				}
-				if(method === 'PATCH'){
-					this.patch(path, ...paths[path])
+				if (method === "PATCH") {
+					this.patch(path, ...paths[path]);
 				}
 			}
-				
 		}
 	}
 
@@ -168,27 +198,45 @@ class Comet {
 
 	setSymerticKey(data: string | Buffer, encoding?: string) {
 		if (!encoding) {
-			this.symetricKey = data as Buffer;
+			this.symmetricKey = data as Buffer;
 		}
 		if (encoding === "hex") {
-			this.symetricKey = Buffer.from(data as string, "hex");
+			this.symmetricKey = Buffer.from(data as string, "hex");
 		}
 		if (encoding === "utf") {
-			this.symetricKey = Buffer.from(data as string, "utf-8"); //! If this is very useless
+			this.symmetricKey = Buffer.from(data as string, "utf-8"); //! If this is very useless
 		}
+	}
+	
+	setIpBlacklist(...list: string[]){
+		list.forEach((address)=>{
+			this.ipBlackList.push(`::ffff:${address}`)
+		})
+		this.ipBlackList
+	}
+	setIpWhitelist(...list: string[]){
+		list.forEach((address)=>{
+			this.ipWhiteList.push(`::ffff:${address}`)
+		})
+		this.ipWhiteList
 	}
 
 	private encrypt(data: string, res: ServerResponse) {
 		const iv = crypto.randomBytes(16);
-		const cipher = crypto.createCipheriv(
-			"aes-256-cbc",
-			this.symetricKey,
-			iv
-		);
-		const encrypted =
-			cipher.update(data, "utf-8", "hex") + cipher.final("hex");
+		//prettier-ignore
+		const cipher = crypto.createCipheriv("aes-256-cbc",this.symmetricKey,iv);
+		//prettier-ignore
+		const encrypted = cipher.update(data, "utf-8", "hex") + cipher.final("hex");
 		const message = `${encrypted}:${iv.toString("hex")}`;
 		res.end(message);
+	}
+	private decrypt(encryptedMsg: string) {
+		const [encrypted, iv] = encryptedMsg.split(":");
+		const decipher = crypto.createDecipheriv("aes-256-cbc", this.symmetricKey, Buffer.from(iv, 'hex'));
+		return (
+			decipher.update(encrypted, "hex", "utf-8") +
+			decipher.final("utf-8")
+		);
 	}
 
 	listen(PORT: number, cb: Function) {

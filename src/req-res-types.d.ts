@@ -12,6 +12,7 @@ declare module "http" {
     interface IncomingMessage {
         saveToFile( fileName: string, maxSize: number)
         body()
+        decrypt()
     }
 
 
