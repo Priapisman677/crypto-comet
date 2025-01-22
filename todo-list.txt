@@ -8,4 +8,9 @@ Handle multipart/form-data
 
 "Adding CORS headers"
 
-stop for a minute and check websockets
+Focus a bit on the front end so that you don't lose these skills:
+Stop for a minute and check websockets. (secure version)
+Learn how to drag and drop files and encrypt them.
+Also in your front end project try to do it so that the first thing that gets exchanged is the keys and after that you send the front end files such as Javascript encrypted.
+
+And let me give you just a hand of what you can do after this and you should look at SQL security, performace, graphql (Whatever that means). That is just to name a few things because I have not even looked at the job post.

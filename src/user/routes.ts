@@ -6,17 +6,26 @@ const router = new Router();
 
 export const sessions: string[] = []
 
-
+//*Middleware: ----------------------------------------------------------------------------
+//prettier-ignore
 export const printHi = (_req: http.IncomingMessage, _res: http.ServerResponse, next: Function)=>{
     console.log('Say hi middleware')
     next()
 }
 
+//prettier-ignore
+const testModifyReqMiddleware =  (req: http.IncomingMessage, _res: http.ServerResponse, next: Function)=>{
+    //% I just wanted to test the nature of an object being a reference to itself.
+    //% When I call a handler that contains this middleware, the request object would have been modified already.
+    (req.body as unknown) = 'df';
+    next()
+}
 
 
+//*Routers: -------------------------------------------------------------------------------
 //prettier-ignore
 router.get('/', (_req: http.IncomingMessage, res: http.ServerResponse)=>{
-    res.sendFile('index.html')
+    res.send('Allowed')
 })
 //prettier-ignore
 
@@ -28,9 +37,9 @@ router.get('/getpath', printHi, async (req: http.IncomingMessage, res: http.Serv
     res.send('Hello from getpath')
 })
 
-//prettier-ignore
-router.get('/testencrypt', (_req: http.IncomingMessage, res: http.ServerResponse)=>{
-    res.encrypt().send('Hello')
+router.get('/testModifyReqMiddleware', testModifyReqMiddleware, async (req: http.IncomingMessage, res: http.ServerResponse)=>{
+    console.log(req.body)
+    res.send('Hello from getpath')
 })
 
 //prettier-ignore

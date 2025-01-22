@@ -1,20 +1,18 @@
 import sendFileFunction from "./utils/sendFile.js";
 import parseBody from "./utils/parseBody.js";
 import saveToFileFunction from "./utils/saveToFileFunction.js";
-
 import Router from "./utils/route-class.js";
 
 export { Router };
 
-//*I'll be using named imports for practice:
-//prettier-ignore
-import {IncomingMessage, ServerResponse, createServer, Server} from "node:http";
+import http from "node:http";
+import https from "node:https";
 import crypto from "node:crypto";
 
 //prettier-ignore
-type Middleware = (req: IncomingMessage, res: ServerResponse, next: Function) => void;
+type Middleware = (req: http.IncomingMessage, res: http.ServerResponse, next: Function) => void;
 //prettier-ignore
-type RouteHandler = (req: IncomingMessage, res: ServerResponse) => void;
+type RouteHandler = (req: http.IncomingMessage, res: http.ServerResponse) => void;
 interface routes {
 	[method: string]: {
 		[path: string]: {
@@ -23,95 +21,117 @@ interface routes {
 		};
 	};
 }
+interface options {
+	key: Buffer;
+	cert: Buffer;
+}
 
 class Comet {
-	server: Server;
+	server: http.Server;
 	routes: routes = {};
-	anyRequest: (req: IncomingMessage, res: ServerResponse)=> void = () =>{}
-	ipBlacklist: string[] = []
-	ipWhitelist: string[] = []
+	//prettier-ignore
+	anyRequest: (req: http.IncomingMessage,res: http.ServerResponse) => void = () => {};
+	ipBlacklist: string[] = [];
+	private blacklistCallback: RouteHandler | undefined = () => {};
+	ipWhitelist: string[] = [];
+	private whitelistCallback: RouteHandler | undefined = () => {};
 	staticDir: string = "./public";
-	willEncrypt: boolean = false;
-	willDecrypt: boolean = false;
+	private willEncrypt: boolean = false;
+	private willDecrypt: boolean = false;
 	symmetricKey: Buffer = crypto.randomBytes(32);
-	keyPair: any = crypto.generateKeyPairSync("rsa", {
-		modulusLength: 2048,
-		publicKeyEncoding: { type: "spki", format: "pem" },
-		privateKeyEncoding: { type: "pkcs8", format: "pem" },
-	});
-	constructor() {
-		this.server = createServer(async (req, res) => {
-			if (this.ipBlacklist.includes(req.socket.remoteAddress!)){
-				res.end('denied')
-				res.destroy()
-				req.destroy()
+	//prettier-ignore
+
+	keyPair: { publicKey: string; privateKey: string } =crypto.generateKeyPairSync("rsa", {
+			modulusLength: 2048,
+			publicKeyEncoding: { type: "spki", format: "pem" },
+			privateKeyEncoding: { type: "pkcs8", format: "pem" },
+		});
+	constructor(public protocol: string, public options?: options) {
+		//prettier-ignore
+		const handler = async (req: http.IncomingMessage,res: http.ServerResponse) => {
+			res.status = (statusCode: number) => {
+				res.statusCode = statusCode;
+				return res;
+			};
+
+			res.encrypt = () => {
+				this.willEncrypt = true;
+				return res;
+			};
+
+			res.send = (data: string) => {
+				if (!this.willEncrypt) {
+					res.end(data);
+				} else {
+					this.willEncrypt = false;
+					this.encryptNsend(data, res);
+				}
+			};
+
+			//prettier-ignore
+			res.sendFile = (fileName: string) => {
+				sendFileFunction(res, this.staticDir, fileName );
+			};
+
+			req.decrypt = () => {
+				this.willDecrypt = true;
+				return req;
+			};
+
+			req.body = async () => {
+				if (!this.willDecrypt) {
+					return await parseBody(req);
+				} else {
+					this.willDecrypt = false;
+					const encrypted = await parseBody(req);
+					if (typeof encrypted === "string") {
+						return this.decrypt(encrypted);
+					} else {
+						return null;
+					}
+				}
+			};
+			//prettier-ignore
+			req.saveToFile = async (fileName: string, maxSize: number = 1e8)=>{
+				return await saveToFileFunction(this.staticDir, req, fileName, maxSize);
 			}
-			if (this.ipWhitelist.length > 0 && !this.ipWhitelist.includes(req.socket.remoteAddress!)){
-				res.end('denied')
-				res.destroy()
-				req.destroy()
+			//prettier-ignore
+			const clientIp = req.headers['x-forwarded-for'] as string || req.socket.remoteAddress!
+
+			if (this.ipBlacklist.includes(clientIp)) {
+				if(this.blacklistCallback) this.blacklistCallback(req, res);
+				
+				return;
 			}
-			this.anyRequest(req, res)
+			//prettier-ignore
+			if (this.ipWhitelist.length > 0 && (!this.ipWhitelist.includes(clientIp))  ){
+				if(this.whitelistCallback) this.whitelistCallback(req, res);
+				return
+			}
+
+			this.anyRequest(req, res);
 			const method = req.method || "GET";
 			const path = req.url || "/";
 			//prettier-ignore
 			const route = this.routes[method.toUpperCase()]?.[path.toLowerCase()]
 			if (route) {
-				(res as any).status = (statusCode: number) => {
-					debugger;
-					res.statusCode = statusCode;
-					return res;
-				};
-
-				res.encrypt = () => {
-					this.willEncrypt = true;
-					return res;
-				};
-
-				res.send = (data: string) => {
-					if (this.willEncrypt) {
-						this.encrypt(data, res);
-						this.willEncrypt = false;
-					} else {
-						res.end(data);
-					}
-				};
-
-				//prettier-ignore
-				res.sendFile = (fileName: string) => {
-                    sendFileFunction(res, this.staticDir, fileName );
-                };
-
-				req.decrypt = () => {
-					this.willDecrypt = true;
-					return req;
-				};
-
-				req.body = async () => {
-					if (!this.willDecrypt) {
-						return await parseBody(req);
-					} else {
-						this.willDecrypt = false
-						const encrypted = await parseBody(req);
-						if (typeof encrypted === "string") {
-							return this.decrypt(encrypted);
-						}else{
-							return null
-						}
-					}
-				};
-				//prettier-ignore
-				req.saveToFile = async (fileName: string, maxSize: number = 1e8)=>{
-					return await saveToFileFunction(this.staticDir, req, fileName, maxSize);
-				}
-
 				//prettier-ignore
 				this.executeMiddlewares(req, res, route.middlewares, ()=>{route.handler(req, res)})
 			} else {
 				res.statusCode = 404;
 				res.end("Route not found");
 			}
-		});
+		};
+		if (this.protocol === "http") {
+			this.server = http.createServer(handler);
+		} else if (this.protocol === "https") {
+			this.server = https.createServer(
+				this.options as https.ServerOptions,
+				handler
+			);
+		} else {
+			this.server = http.createServer(handler);
+		}
 	}
 
 	//prettier-ignore
@@ -153,13 +173,9 @@ class Comet {
 		this.routes.PATCH[path.toLowerCase()] = { middlewares, handler}
 	}
 
-	private executeMiddlewares(
-		req: IncomingMessage,
-		res: ServerResponse,
-		middlewares: Middleware[],
-		finalHandler: Function
-	) {
-		//prettier-ignore
+	//prettier-ignore
+	private executeMiddlewares(req: http.IncomingMessage,res: http.ServerResponse,middlewares: Middleware[],
+		finalHandler: Function) {
 		const execute = (index: number)=>{
 			if(index < middlewares.length){
 				middlewares[index](req, res, ()=>{execute(index+1)})
@@ -172,22 +188,22 @@ class Comet {
 
 	useRouter(Router: Router) {
 		for (const method in Router.routes) {
-			const paths = Router.routes[method];
-			for (const path in paths) {
+			const pathsNfuntcions = Router.routes[method];
+			for (const path in pathsNfuntcions) {
 				if (method === "GET") {
-					this.get(path, ...paths[path]);
+					this.get(path, ...pathsNfuntcions[path]);
 				}
 				if (method === "POST") {
-					this.post(path, ...paths[path]);
+					this.post(path, ...pathsNfuntcions[path]);
 				}
 				if (method === "DELETE") {
-					this.delete(path, ...paths[path]);
+					this.delete(path, ...pathsNfuntcions[path]);
 				}
 				if (method === "PUT") {
-					this.put(path, ...paths[path]);
+					this.put(path, ...pathsNfuntcions[path]);
 				}
 				if (method === "PATCH") {
-					this.patch(path, ...paths[path]);
+					this.patch(path, ...pathsNfuntcions[path]);
 				}
 			}
 		}
@@ -205,28 +221,30 @@ class Comet {
 			this.symmetricKey = Buffer.from(data as string, "hex");
 		}
 		if (encoding === "utf") {
-			this.symmetricKey = Buffer.from(data as string, "utf-8"); //! If this is very useless
+			this.symmetricKey = Buffer.from(data as string, "utf-8"); //! I think this is very useless
 		}
 	}
-	
-	setIpBlacklist(...list: string[]){
-		list.forEach((address)=>{
-			this.ipBlacklist.push(`::ffff:${address}`)
-		})
-		this.ipBlacklist
+
+	setIpBlacklist(list: string[], callback?: RouteHandler | undefined) {
+		this.blacklistCallback = callback;
+		list.forEach((address) => {
+			this.ipBlacklist.push(`::ffff:${address}`, `${address}`);
+		});
 	}
-	setIpWhitelist(...list: string[]){
-		list.forEach((address)=>{
-			this.ipWhitelist.push(`::ffff:${address}`)
-		})
-		this.ipWhitelist
+	setIpWhitelist(list: string[], callback?: RouteHandler | undefined) {
+		this.whitelistCallback = callback;
+		list.forEach((address) => {
+			this.ipWhitelist.push(`::ffff:${address}`, `${address}`);
+		});
 	}
 
-	setAnyRequest(func: (req: IncomingMessage, res: ServerResponse)=>void){
-		this.anyRequest = func
+	setAnyRequest(
+		func: (req: http.IncomingMessage, res: http.ServerResponse) => void
+	) {
+		this.anyRequest = func;
 	}
 
-	private encrypt(data: string, res: ServerResponse) {
+	private encryptNsend(data: string, res: http.ServerResponse) {
 		const iv = crypto.randomBytes(16);
 		//prettier-ignore
 		const cipher = crypto.createCipheriv("aes-256-cbc",this.symmetricKey,iv);
@@ -237,7 +255,11 @@ class Comet {
 	}
 	private decrypt(encryptedMsg: string) {
 		const [encrypted, iv] = encryptedMsg.split(":");
-		const decipher = crypto.createDecipheriv("aes-256-cbc", this.symmetricKey, Buffer.from(iv, 'hex'));
+		const decipher = crypto.createDecipheriv(
+			"aes-256-cbc",
+			this.symmetricKey,
+			Buffer.from(iv, "hex")
+		);
 		return (
 			decipher.update(encrypted, "hex", "utf-8") +
 			decipher.final("utf-8")

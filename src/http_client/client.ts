@@ -61,6 +61,7 @@ const getpublicKey = () => {
 	const request = http.request(options, (res) => {
 		res.on("data", (chunk) => {
 			publicKey = chunk.toString()
+			
 		});
 		res.on("end", () => {
 			console.log("Received public key");

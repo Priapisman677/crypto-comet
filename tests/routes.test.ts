@@ -1,19 +1,19 @@
 import request from "supertest";
 import fs from "node:fs";
-import crypto from 'node:crypto'
+import crypto from "node:crypto";
 import server from "../src/user/server-setup.js";
 import { sessions } from "../src/user/routes.js";
 import { describe, test, expect, beforeAll } from "vitest";
+import http from "node:http";
 
 describe("Routes", () => {
+	//* Creating a custom handler for testing IP whitelist and blacklist:
 	let cookie;
-	const constantKey = server.symmetricKey
+	const constantKey = server.symmetricKey;
 	// Buffer.from('e49a5e61a1786622984acd671667c1e8ddcffa4041963df47ef8bc738dfa26a6', 'hex')
 	beforeAll(() => {
 		cookie = Math.floor(Math.random() * 100000000000).toString();
-
 		sessions.push(cookie);
-		
 	});
 	test("/getpath should work", async () => {
 		const response = await request(server.server)
@@ -111,13 +111,55 @@ describe("Routes", () => {
 			.expect(401);
 		expect(response.text).toBe("cookie verification failed!");
 	});
-	test('Encryption and decreptrion should work', async()=>{
+	test("Encryption and decreptrion should work", async () => {
 		const response = await request(server.server)
-		.get('/testencrypt')
+			.get("/testencrypt")
+			.expect(200);
+		const [encrypted, iv] = response.text.split(":");
+		const decipher = crypto.createDecipheriv(
+			"aes-256-cbc",
+			constantKey,
+			Buffer.from(iv, "hex")
+		);
+		const message =
+			decipher.update(encrypted, "hex", "utf8") +
+			decipher.final("utf8");
+		expect(message).toBe("Hello");
+	});
+	test("Ip blacklist should work for blocked ip", async () => {
+		//* Here I directly modified the IP blacklist and at the end of the following test I set the blacklist back to an empty array.
+		server.setIpBlacklist(['2.2.2.2'], (req: http.IncomingMessage, res: http.ServerResponse)=>{
+			(res as any).status(401).send('Denied')
+		})
+		const response = await request(server.server)
+		.get("/")
+		.set('x-forwarded-for', '2.2.2.2')
+		.expect(401)
+		expect(response.text).toBe("Denied");
+	});
+	test("Ip blacklist should work for allowed ip", async () => {
+		const response = await request(server.server)
+		.get("/")
+		.set('x-forwarded-for', '1.1.1.1')
 		.expect(200)
-		const [encrypted, iv] = response.text.split(':')
-		const decipher = crypto.createDecipheriv('aes-256-cbc', constantKey, Buffer.from(iv, 'hex'))
-		const message = decipher.update(encrypted, 'hex', 'utf8') + decipher.final('utf8')
-		expect(message).toBe('Hello')
-	})
+		expect(response.text).toBe("Allowed");
+		server.ipBlacklist = []; //* Setting the blacklist back to an empty array.
+	});
+	test("Ip whitelist should work for blocked ip", async () => {
+		server.setIpWhitelist(['2.2.2.2'], (req: http.IncomingMessage, res: http.ServerResponse)=>{
+			(res as any).status(401).send('Denied')
+		})
+		const response = await request(server.server)
+		.get("/")
+		.set('x-forwarded-for', '1.1.1.1')
+		.expect(401)
+		expect(response.text).toBe("Denied");
+	});
+	test("Ip whitelist should work for blocked ip", async () => {
+		const response = await request(server.server)
+		.get("/")
+		.set('x-forwarded-for', '2.2.2.2')
+		.expect(200)
+		expect(response.text).toBe("Allowed");
+	});
 });

@@ -23,7 +23,7 @@ class Router {
         this.routes.GET[path] = middlewaresAndHandler
     }
     //prettier-ignore
-     post(path: string, ...middlewaresAndHandler: (Middleware | RouteHandler)[]){
+    post(path: string, ...middlewaresAndHandler: (Middleware | RouteHandler)[]){
         if(!this.routes.POST) this.routes.POST = {}
         this.routes.POST[path] = middlewaresAndHandler
     }
@@ -35,6 +35,10 @@ class Router {
     patch(path: string, ...middlewaresAndHandler: (Middleware | RouteHandler)[]){
         if(!this.routes.PATCH) this.routes.PATCH = {}
         this.routes.PATCH[path] = middlewaresAndHandler
+    }
+    update(path: string, ...middlewaresAndHandler: (Middleware | RouteHandler)[]){
+        if(!this.routes.UPDATE) this.routes.UPDATE = {}
+        this.routes.UPDATE[path] = middlewaresAndHandler
     }
     //prettier-ignore
 
