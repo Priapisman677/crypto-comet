@@ -27,8 +27,9 @@ interface routes {
 class Comet {
 	server: Server;
 	routes: routes = {};
-	ipBlackList: string[] = []
-	ipWhiteList: string[] = []
+	anyRequest: (req: IncomingMessage, res: ServerResponse)=> void = () =>{}
+	ipBlacklist: string[] = []
+	ipWhitelist: string[] = []
 	staticDir: string = "./public";
 	willEncrypt: boolean = false;
 	willDecrypt: boolean = false;
@@ -40,17 +41,17 @@ class Comet {
 	});
 	constructor() {
 		this.server = createServer(async (req, res) => {
-			if (this.ipBlackList.includes(req.socket.remoteAddress!)){
+			if (this.ipBlacklist.includes(req.socket.remoteAddress!)){
 				res.end('denied')
 				res.destroy()
 				req.destroy()
 			}
-			if (this.ipWhiteList.length > 0 && !this.ipWhiteList.includes(req.socket.remoteAddress!)){
+			if (this.ipWhitelist.length > 0 && !this.ipWhitelist.includes(req.socket.remoteAddress!)){
 				res.end('denied')
 				res.destroy()
 				req.destroy()
 			}
-			// console.log(req.url, req.method)
+			this.anyRequest(req, res)
 			const method = req.method || "GET";
 			const path = req.url || "/";
 			//prettier-ignore
@@ -210,15 +211,19 @@ class Comet {
 	
 	setIpBlacklist(...list: string[]){
 		list.forEach((address)=>{
-			this.ipBlackList.push(`::ffff:${address}`)
+			this.ipBlacklist.push(`::ffff:${address}`)
 		})
-		this.ipBlackList
+		this.ipBlacklist
 	}
 	setIpWhitelist(...list: string[]){
 		list.forEach((address)=>{
-			this.ipWhiteList.push(`::ffff:${address}`)
+			this.ipWhitelist.push(`::ffff:${address}`)
 		})
-		this.ipWhiteList
+		this.ipWhitelist
+	}
+
+	setAnyRequest(func: (req: IncomingMessage, res: ServerResponse)=>void){
+		this.anyRequest = func
 	}
 
 	private encrypt(data: string, res: ServerResponse) {
